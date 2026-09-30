@@ -1,0 +1,943 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>date journal</title>
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,500;1,400;1,500&family=DM+Sans:wght@300;400;500&family=DM+Mono:wght@300;400&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<style>
+  :root {
+    --cream: #FAF7F2;
+    --warm-white: #F5F0E8;
+    --sand: #E8DDD0;
+    --blush: #E8C4B8;
+    --rose: #C4816D;
+    --deep-rose: #9B5E52;
+    --wine: #6B3A3A;
+    --ink: #2A1F1F;
+    --muted: #8A7A72;
+    --light-muted: #C4B8B0;
+    --panel-bg: rgba(250, 247, 242, 0.97);
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: 'DM Sans', sans-serif;
+    background: var(--cream);
+    color: var(--ink);
+    height: 100vh;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+  }
+
+  /* HEADER */
+  header {
+    position: relative;
+    z-index: 1000;
+    background: var(--wine);
+    color: var(--cream);
+    padding: 14px 28px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    border-bottom: 1px solid var(--deep-rose);
+  }
+
+  .header-title {
+    font-family: 'Playfair Display', serif;
+    font-size: 22px;
+    font-style: italic;
+    letter-spacing: 0.02em;
+  }
+
+  .header-subtitle {
+    font-size: 11px;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--blush);
+    margin-top: 2px;
+    font-weight: 300;
+  }
+
+  .header-actions {
+    display: flex;
+    gap: 12px;
+    align-items: center;
+  }
+
+  .btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    padding: 8px 18px;
+    border-radius: 2px;
+    font-family: 'DM Sans', sans-serif;
+    font-size: 12px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    letter-spacing: 0.05em;
+    border: none;
+  }
+
+  .btn-primary {
+    background: var(--blush);
+    color: var(--wine);
+  }
+  .btn-primary:hover { background: var(--rose); color: white; }
+
+  .btn-ghost {
+    background: transparent;
+    color: var(--blush);
+    border: 1px solid rgba(232, 196, 184, 0.3);
+  }
+  .btn-ghost:hover { background: rgba(232, 196, 184, 0.1); }
+
+  /* LAYOUT */
+  .app-body {
+    display: flex;
+    flex: 1;
+    overflow: hidden;
+  }
+
+  /* MAP */
+  #map {
+    flex: 1;
+    height: 100%;
+    cursor: crosshair;
+  }
+
+  /* Override leaflet */
+  .leaflet-container { font-family: 'DM Sans', sans-serif; }
+  .leaflet-popup-content-wrapper {
+    border-radius: 4px;
+    box-shadow: 0 8px 40px rgba(42,31,31,0.18);
+    border: 1px solid var(--sand);
+  }
+  .leaflet-popup-content { margin: 0; padding: 0; }
+  .leaflet-popup-tip { background: white; }
+
+  /* SIDEBAR */
+  .sidebar {
+    width: 340px;
+    min-width: 340px;
+    height: 100%;
+    background: var(--panel-bg);
+    border-left: 1px solid var(--sand);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+
+  .sidebar-header {
+    padding: 20px 22px 16px;
+    border-bottom: 1px solid var(--sand);
+  }
+
+  .sidebar-title {
+    font-family: 'Playfair Display', serif;
+    font-size: 16px;
+    color: var(--wine);
+    margin-bottom: 4px;
+  }
+
+  .sidebar-count {
+    font-size: 11px;
+    color: var(--muted);
+    letter-spacing: 0.08em;
+  }
+
+  .sidebar-list {
+    flex: 1;
+    overflow-y: auto;
+    padding: 12px 0;
+  }
+
+  .sidebar-list::-webkit-scrollbar { width: 4px; }
+  .sidebar-list::-webkit-scrollbar-track { background: transparent; }
+  .sidebar-list::-webkit-scrollbar-thumb { background: var(--sand); border-radius: 2px; }
+
+  .entry-card {
+    padding: 16px 22px;
+    border-bottom: 1px solid rgba(232, 221, 208, 0.5);
+    cursor: pointer;
+    transition: background 0.15s ease;
+    position: relative;
+  }
+
+  .entry-card:hover { background: rgba(232, 221, 208, 0.3); }
+  .entry-card.active { background: rgba(196, 129, 109, 0.08); border-left: 3px solid var(--rose); }
+
+  .entry-date {
+    font-family: 'DM Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 0.1em;
+    color: var(--rose);
+    text-transform: uppercase;
+    margin-bottom: 5px;
+  }
+
+  .entry-name {
+    font-family: 'Playfair Display', serif;
+    font-size: 15px;
+    color: var(--ink);
+    margin-bottom: 4px;
+    font-weight: 500;
+  }
+
+  .entry-location {
+    font-size: 11px;
+    color: var(--muted);
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    margin-bottom: 6px;
+  }
+
+  .entry-preview {
+    font-size: 12px;
+    color: var(--muted);
+    line-height: 1.5;
+    overflow: hidden;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+  }
+
+  .entry-photo-thumb {
+    position: absolute;
+    right: 16px;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 44px;
+    height: 44px;
+    border-radius: 3px;
+    object-fit: cover;
+    border: 1px solid var(--sand);
+  }
+
+  .empty-state {
+    padding: 40px 24px;
+    text-align: center;
+    color: var(--muted);
+  }
+
+  .empty-state-icon {
+    font-size: 36px;
+    margin-bottom: 14px;
+    opacity: 0.5;
+  }
+
+  .empty-state h3 {
+    font-family: 'Playfair Display', serif;
+    font-size: 16px;
+    color: var(--wine);
+    margin-bottom: 8px;
+    font-style: italic;
+  }
+
+  .empty-state p {
+    font-size: 12px;
+    line-height: 1.6;
+  }
+
+  /* MAP INSTRUCTION OVERLAY */
+  .map-hint {
+    position: absolute;
+    bottom: 30px;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 900;
+    background: rgba(42,31,31,0.82);
+    color: var(--cream);
+    padding: 10px 20px;
+    border-radius: 2px;
+    font-size: 12px;
+    letter-spacing: 0.05em;
+    pointer-events: none;
+    transition: opacity 0.4s ease;
+    white-space: nowrap;
+  }
+
+  /* MODAL */
+  .modal-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(42, 31, 31, 0.5);
+    backdrop-filter: blur(4px);
+    z-index: 2000;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.25s ease;
+  }
+
+  .modal-overlay.open {
+    opacity: 1;
+    pointer-events: all;
+  }
+
+  .modal {
+    background: var(--cream);
+    width: 520px;
+    max-width: 95vw;
+    max-height: 90vh;
+    border-radius: 4px;
+    overflow-y: auto;
+    transform: translateY(16px);
+    transition: transform 0.25s ease;
+    box-shadow: 0 24px 80px rgba(42, 31, 31, 0.25);
+  }
+
+  .modal-overlay.open .modal { transform: translateY(0); }
+
+  .modal-header {
+    padding: 28px 32px 20px;
+    border-bottom: 1px solid var(--sand);
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+  }
+
+  .modal-title {
+    font-family: 'Playfair Display', serif;
+    font-size: 20px;
+    font-style: italic;
+    color: var(--wine);
+  }
+
+  .modal-coords {
+    font-family: 'DM Mono', monospace;
+    font-size: 10px;
+    color: var(--muted);
+    margin-top: 4px;
+    letter-spacing: 0.05em;
+  }
+
+  .modal-close {
+    background: none;
+    border: none;
+    cursor: pointer;
+    color: var(--muted);
+    font-size: 20px;
+    padding: 2px 6px;
+    border-radius: 2px;
+    transition: color 0.15s;
+  }
+  .modal-close:hover { color: var(--wine); }
+
+  .modal-body {
+    padding: 24px 32px;
+  }
+
+  .form-group {
+    margin-bottom: 20px;
+  }
+
+  .form-label {
+    display: block;
+    font-size: 11px;
+    font-weight: 500;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin-bottom: 8px;
+  }
+
+  .form-input, .form-textarea {
+    width: 100%;
+    padding: 10px 14px;
+    border: 1px solid var(--sand);
+    border-radius: 2px;
+    background: white;
+    font-family: 'DM Sans', sans-serif;
+    font-size: 14px;
+    color: var(--ink);
+    transition: border-color 0.2s;
+    outline: none;
+  }
+
+  .form-input:focus, .form-textarea:focus {
+    border-color: var(--rose);
+    box-shadow: 0 0 0 3px rgba(196, 129, 109, 0.1);
+  }
+
+  .form-textarea {
+    resize: vertical;
+    min-height: 100px;
+    line-height: 1.6;
+  }
+
+  .form-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 14px;
+  }
+
+  /* Photo upload */
+  .photo-upload-area {
+    border: 2px dashed var(--sand);
+    border-radius: 3px;
+    padding: 24px;
+    text-align: center;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    background: rgba(255,255,255,0.5);
+  }
+
+  .photo-upload-area:hover {
+    border-color: var(--rose);
+    background: rgba(196, 129, 109, 0.04);
+  }
+
+  .photo-upload-area.has-photo { padding: 10px; border-style: solid; border-color: var(--blush); }
+
+  .photo-upload-text {
+    font-size: 12px;
+    color: var(--muted);
+    margin-top: 8px;
+  }
+
+  .photo-preview {
+    max-width: 100%;
+    max-height: 200px;
+    border-radius: 3px;
+    object-fit: cover;
+  }
+
+  .photo-remove {
+    display: block;
+    text-align: center;
+    font-size: 11px;
+    color: var(--rose);
+    margin-top: 8px;
+    cursor: pointer;
+    text-decoration: underline;
+  }
+
+  .modal-footer {
+    padding: 16px 32px 28px;
+    display: flex;
+    gap: 10px;
+    justify-content: flex-end;
+    border-top: 1px solid var(--sand);
+  }
+
+  .btn-danger {
+    background: transparent;
+    color: #c0392b;
+    border: 1px solid #e8c4c4;
+    margin-right: auto;
+  }
+  .btn-danger:hover { background: #fdf0ef; }
+
+  /* POPUP */
+  .map-popup {
+    width: 240px;
+    font-family: 'DM Sans', sans-serif;
+  }
+
+  .popup-photo {
+    width: 100%;
+    height: 130px;
+    object-fit: cover;
+    display: block;
+  }
+
+  .popup-body { padding: 14px 16px; }
+
+  .popup-date {
+    font-family: 'DM Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 0.08em;
+    color: var(--rose);
+    text-transform: uppercase;
+    margin-bottom: 4px;
+  }
+
+  .popup-name {
+    font-family: 'Playfair Display', serif;
+    font-size: 15px;
+    font-weight: 500;
+    color: var(--ink);
+    margin-bottom: 6px;
+  }
+
+  .popup-location {
+    font-size: 11px;
+    color: var(--muted);
+    margin-bottom: 8px;
+  }
+
+  .popup-notes {
+    font-size: 12px;
+    color: #5a4a45;
+    line-height: 1.55;
+    margin-bottom: 12px;
+  }
+
+  .popup-edit {
+    font-size: 11px;
+    color: var(--rose);
+    cursor: pointer;
+    text-decoration: underline;
+    background: none;
+    border: none;
+    padding: 0;
+    font-family: 'DM Sans', sans-serif;
+  }
+
+  /* CUSTOM MARKER */
+  .custom-marker {
+    width: 28px;
+    height: 28px;
+    background: var(--wine);
+    border: 2.5px solid var(--blush);
+    border-radius: 50% 50% 50% 0;
+    transform: rotate(-45deg);
+    box-shadow: 0 3px 12px rgba(107, 58, 58, 0.4);
+    cursor: pointer;
+    transition: transform 0.2s ease;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .custom-marker.has-photo {
+    background: var(--deep-rose);
+    border-color: var(--cream);
+  }
+
+  .custom-marker-inner {
+    width: 8px;
+    height: 8px;
+    background: var(--blush);
+    border-radius: 50%;
+    transform: rotate(45deg);
+  }
+
+  .leaflet-marker-icon:hover .custom-marker {
+    transform: rotate(-45deg) scale(1.2);
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div>
+    <div class="header-title">a little map of us</div>
+    <div class="header-subtitle">date journal · click anywhere on the map to add</div>
+  </div>
+  <div class="header-actions">
+    <button class="btn btn-ghost" onclick="exportData()">↓ export</button>
+    <label class="btn btn-ghost" style="cursor:pointer">
+      ↑ import
+      <input type="file" accept=".json" onchange="importData(event)" style="display:none">
+    </label>
+  </div>
+</header>
+
+<div class="app-body">
+  <div id="map"></div>
+
+  <aside class="sidebar">
+    <div class="sidebar-header">
+      <div class="sidebar-title">your dates</div>
+      <div class="sidebar-count" id="entry-count">0 entries</div>
+    </div>
+    <div class="sidebar-list" id="sidebar-list">
+      <div class="empty-state">
+        <div class="empty-state-icon">🗺️</div>
+        <h3>no memories yet</h3>
+        <p>click anywhere on the map to pin a date — add the place, your thoughts, and a photo.</p>
+      </div>
+    </div>
+  </aside>
+</div>
+
+<div class="map-hint" id="map-hint">click anywhere on the map to pin a date</div>
+
+<!-- ADD / EDIT MODAL -->
+<div class="modal-overlay" id="modal-overlay">
+  <div class="modal">
+    <div class="modal-header">
+      <div>
+        <div class="modal-title" id="modal-title">add a date</div>
+        <div class="modal-coords" id="modal-coords"></div>
+      </div>
+      <button class="modal-close" onclick="closeModal()">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">date name / title</label>
+          <input class="form-input" id="f-name" placeholder="e.g. rooftop dinner, art gallery...">
+        </div>
+        <div class="form-group">
+          <label class="form-label">date</label>
+          <input class="form-input" id="f-date" type="date">
+        </div>
+      </div>
+      <div class="form-group">
+        <label class="form-label">location name</label>
+        <input class="form-input" id="f-location" placeholder="e.g. Le Bernardin, Central Park...">
+      </div>
+      <div class="form-group">
+        <label class="form-label">your thoughts & memories</label>
+        <textarea class="form-textarea" id="f-notes" placeholder="what happened, what you felt, what you want to remember..."></textarea>
+      </div>
+      <div class="form-group">
+        <label class="form-label">photo</label>
+        <div class="photo-upload-area" id="photo-drop" onclick="document.getElementById('photo-input').click()">
+          <div id="photo-placeholder">
+            <div style="font-size:26px;opacity:0.4;">📷</div>
+            <div class="photo-upload-text">click to attach a photo</div>
+          </div>
+          <img class="photo-preview" id="photo-preview" style="display:none">
+          <span class="photo-remove" id="photo-remove" style="display:none" onclick="removePhoto(event)">remove photo</span>
+        </div>
+        <input type="file" id="photo-input" accept="image/*" style="display:none" onchange="handlePhoto(event)">
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-danger" id="delete-btn" style="display:none" onclick="deleteEntry()">delete</button>
+      <button class="btn btn-ghost" onclick="closeModal()">cancel</button>
+      <button class="btn btn-primary" onclick="saveEntry()">save memory</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ─── STATE ───────────────────────────────────────────────────────────────────
+let entries = [];
+let activeId = null;       // entry being edited
+let pendingLatLng = null;  // coords from last map click
+let markers = {};          // leaflet marker objects keyed by id
+let tempPhotoData = null;  // base64 photo for current form
+
+// ─── MAP SETUP ───────────────────────────────────────────────────────────────
+const map = L.map('map', {
+  center: [40.7128, -74.0060],
+  zoom: 12,
+  zoomControl: false
+});
+
+L.control.zoom({ position: 'topleft' }).addTo(map);
+
+L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/{z}/{y}/{x}', {
+  attribution: 'Tiles © Esri — Esri, DeLorme, NAVTEQ',
+  maxZoom: 19
+}).addTo(map);
+
+map.on('click', (e) => {
+  pendingLatLng = e.latlng;
+  activeId = null;
+  openModal(false);
+  fadeHint();
+});
+
+// Hide hint after first click
+function fadeHint() {
+  const hint = document.getElementById('map-hint');
+  hint.style.opacity = '0';
+  setTimeout(() => hint.style.display = 'none', 500);
+}
+
+// ─── STORAGE ─────────────────────────────────────────────────────────────────
+function save() {
+  try { localStorage.setItem('date-journal', JSON.stringify(entries)); } catch(e) {}
+}
+
+function load() {
+  try {
+    const d = localStorage.getItem('date-journal');
+    if (d) { entries = JSON.parse(d); entries.forEach(addMarker); renderSidebar(); }
+  } catch(e) { entries = []; }
+}
+
+// ─── MARKER ──────────────────────────────────────────────────────────────────
+function createIcon(hasPhoto) {
+  return L.divIcon({
+    className: '',
+    html: `<div class="custom-marker ${hasPhoto ? 'has-photo' : ''}">
+             <div class="custom-marker-inner"></div>
+           </div>`,
+    iconSize: [28, 28],
+    iconAnchor: [14, 28],
+    popupAnchor: [0, -32]
+  });
+}
+
+function addMarker(entry) {
+  if (markers[entry.id]) { map.removeLayer(markers[entry.id]); }
+
+  const marker = L.marker([entry.lat, entry.lng], {
+    icon: createIcon(!!entry.photo)
+  }).addTo(map);
+
+  marker.bindPopup(buildPopupHTML(entry), { maxWidth: 250, className: '' });
+  marker.on('click', () => {
+    highlightSidebar(entry.id);
+  });
+
+  markers[entry.id] = marker;
+}
+
+function buildPopupHTML(entry) {
+  const photoHTML = entry.photo
+    ? `<img class="popup-photo" src="${entry.photo}" alt="date photo">`
+    : '';
+  const dateStr = entry.date
+    ? new Date(entry.date + 'T00:00:00').toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })
+    : '';
+  return `
+    <div class="map-popup">
+      ${photoHTML}
+      <div class="popup-body">
+        ${dateStr ? `<div class="popup-date">${dateStr}</div>` : ''}
+        <div class="popup-name">${entry.name || 'unnamed date'}</div>
+        ${entry.location ? `<div class="popup-location">📍 ${entry.location}</div>` : ''}
+        ${entry.notes ? `<div class="popup-notes">${entry.notes.substring(0,140)}${entry.notes.length > 140 ? '…' : ''}</div>` : ''}
+        <button class="popup-edit" onclick="editEntry('${entry.id}')">edit entry →</button>
+      </div>
+    </div>`;
+}
+
+// ─── MODAL ───────────────────────────────────────────────────────────────────
+function openModal(isEdit) {
+  const overlay = document.getElementById('modal-overlay');
+  const deleteBtn = document.getElementById('delete-btn');
+
+  if (isEdit && activeId) {
+    const entry = entries.find(e => e.id === activeId);
+    document.getElementById('modal-title').textContent = 'edit this date';
+    document.getElementById('modal-coords').textContent =
+      `${entry.lat.toFixed(5)}, ${entry.lng.toFixed(5)}`;
+    document.getElementById('f-name').value = entry.name || '';
+    document.getElementById('f-date').value = entry.date || '';
+    document.getElementById('f-location').value = entry.location || '';
+    document.getElementById('f-notes').value = entry.notes || '';
+    tempPhotoData = entry.photo || null;
+    deleteBtn.style.display = 'inline-flex';
+  } else {
+    document.getElementById('modal-title').textContent = 'add a date';
+    document.getElementById('modal-coords').textContent =
+      pendingLatLng ? `${pendingLatLng.lat.toFixed(5)}, ${pendingLatLng.lng.toFixed(5)}` : '';
+    document.getElementById('f-name').value = '';
+    document.getElementById('f-date').value = new Date().toISOString().split('T')[0];
+    document.getElementById('f-location').value = '';
+    document.getElementById('f-notes').value = '';
+    tempPhotoData = null;
+    deleteBtn.style.display = 'none';
+  }
+
+  // Sync photo UI
+  syncPhotoUI();
+  overlay.classList.add('open');
+}
+
+function closeModal() {
+  document.getElementById('modal-overlay').classList.remove('open');
+  tempPhotoData = null;
+  activeId = null;
+  pendingLatLng = null;
+}
+
+// Close on overlay click
+document.getElementById('modal-overlay').addEventListener('click', (e) => {
+  if (e.target === document.getElementById('modal-overlay')) closeModal();
+});
+
+function editEntry(id) {
+  activeId = id;
+  const entry = entries.find(e => e.id === id);
+  if (!entry) return;
+  pendingLatLng = { lat: entry.lat, lng: entry.lng };
+  openModal(true);
+}
+
+// ─── SAVE / DELETE ────────────────────────────────────────────────────────────
+function saveEntry() {
+  const name = document.getElementById('f-name').value.trim() || 'unnamed date';
+  const date = document.getElementById('f-date').value;
+  const location = document.getElementById('f-location').value.trim();
+  const notes = document.getElementById('f-notes').value.trim();
+
+  if (activeId) {
+    // Update
+    const entry = entries.find(e => e.id === activeId);
+    Object.assign(entry, { name, date, location, notes, photo: tempPhotoData });
+    addMarker(entry);
+  } else {
+    // New
+    const entry = {
+      id: Date.now().toString(36) + Math.random().toString(36).slice(2, 6),
+      lat: pendingLatLng.lat,
+      lng: pendingLatLng.lng,
+      name, date, location, notes,
+      photo: tempPhotoData
+    };
+    entries.push(entry);
+    addMarker(entry);
+  }
+
+  save();
+  renderSidebar();
+  closeModal();
+}
+
+function deleteEntry() {
+  if (!activeId) return;
+  if (!confirm('delete this memory?')) return;
+  const idx = entries.findIndex(e => e.id === activeId);
+  if (idx > -1) {
+    map.removeLayer(markers[activeId]);
+    delete markers[activeId];
+    entries.splice(idx, 1);
+  }
+  save();
+  renderSidebar();
+  closeModal();
+}
+
+// ─── PHOTO ───────────────────────────────────────────────────────────────────
+function handlePhoto(event) {
+  const file = event.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = (e) => {
+    tempPhotoData = e.target.result;
+    syncPhotoUI();
+  };
+  reader.readAsDataURL(file);
+  event.target.value = '';
+}
+
+function removePhoto(e) {
+  e.stopPropagation();
+  tempPhotoData = null;
+  syncPhotoUI();
+}
+
+function syncPhotoUI() {
+  const drop = document.getElementById('photo-drop');
+  const placeholder = document.getElementById('photo-placeholder');
+  const preview = document.getElementById('photo-preview');
+  const removeBtn = document.getElementById('photo-remove');
+
+  if (tempPhotoData) {
+    drop.classList.add('has-photo');
+    placeholder.style.display = 'none';
+    preview.src = tempPhotoData;
+    preview.style.display = 'block';
+    removeBtn.style.display = 'block';
+  } else {
+    drop.classList.remove('has-photo');
+    placeholder.style.display = 'block';
+    preview.style.display = 'none';
+    preview.src = '';
+    removeBtn.style.display = 'none';
+  }
+}
+
+// ─── SIDEBAR ─────────────────────────────────────────────────────────────────
+function renderSidebar() {
+  const list = document.getElementById('sidebar-list');
+  const count = document.getElementById('entry-count');
+
+  count.textContent = entries.length === 1 ? '1 entry' : `${entries.length} entries`;
+
+  if (entries.length === 0) {
+    list.innerHTML = `
+      <div class="empty-state">
+        <div class="empty-state-icon">🗺️</div>
+        <h3>no memories yet</h3>
+        <p>click anywhere on the map to pin a date — add the place, your thoughts, and a photo.</p>
+      </div>`;
+    return;
+  }
+
+  const sorted = [...entries].sort((a, b) => (b.date || '').localeCompare(a.date || ''));
+
+  list.innerHTML = sorted.map(entry => {
+    const dateStr = entry.date
+      ? new Date(entry.date + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+      : 'date unknown';
+    const thumb = entry.photo
+      ? `<img class="entry-photo-thumb" src="${entry.photo}" alt="">`
+      : '';
+    return `
+      <div class="entry-card" id="card-${entry.id}" onclick="flyTo('${entry.id}')">
+        <div class="entry-date">${dateStr}</div>
+        <div class="entry-name">${entry.name || 'unnamed date'}</div>
+        ${entry.location ? `<div class="entry-location">📍 ${entry.location}</div>` : ''}
+        ${entry.notes ? `<div class="entry-preview" style="${entry.photo ? 'padding-right:58px' : ''}">${entry.notes}</div>` : ''}
+        ${thumb}
+      </div>`;
+  }).join('');
+}
+
+function flyTo(id) {
+  const entry = entries.find(e => e.id === id);
+  if (!entry) return;
+  map.flyTo([entry.lat, entry.lng], 15, { duration: 1 });
+  setTimeout(() => {
+    if (markers[id]) markers[id].openPopup();
+  }, 1000);
+  highlightSidebar(id);
+}
+
+function highlightSidebar(id) {
+  document.querySelectorAll('.entry-card').forEach(c => c.classList.remove('active'));
+  const card = document.getElementById(`card-${id}`);
+  if (card) {
+    card.classList.add('active');
+    card.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+  }
+}
+
+// ─── EXPORT / IMPORT ─────────────────────────────────────────────────────────
+function exportData() {
+  const blob = new Blob([JSON.stringify(entries, null, 2)], { type: 'application/json' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'date-journal.json';
+  a.click();
+}
+
+function importData(event) {
+  const file = event.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = (e) => {
+    try {
+      const data = JSON.parse(e.target.result);
+      if (!Array.isArray(data)) { alert('invalid format'); return; }
+      // Clear existing markers
+      Object.values(markers).forEach(m => map.removeLayer(m));
+      markers = {};
+      entries = data;
+      entries.forEach(addMarker);
+      save();
+      renderSidebar();
+      if (entries.length > 0) {
+        const first = entries[0];
+        map.flyTo([first.lat, first.lng], 10);
+      }
+    } catch(err) { alert('could not read file'); }
+  };
+  reader.readAsText(file);
+  event.target.value = '';
+}
+
+// ─── INIT ─────────────────────────────────────────────────────────────────────
+load();
+</script>
+</body>
+</html>
